@@ -1,4 +1,5 @@
 import csv
+import random
 
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
@@ -79,6 +80,24 @@ def load_exclusions_from_dflocations(dflocations_filename):
                 town_exclusions.add((worldX, worldY))
     return exclusions, town_exclusions
 
+def should_generate_location(probability):
+    """Return True with a likelihood of 1/probability."""
+    return random.randint(1, probability) == 1
+
+def generate_wilderness_centers(has_road, exclusions, x, y):
+    centers = []
+    if has_road:
+        # In cells with roads, also check the empty cells for a 1 in 18 chance of location
+        for terrainX in range(0, 128, 64):
+            for terrainY in range(0, 128, 64):
+                if (terrainX, terrainY) != (64, 64) and should_generate_location(18):
+                    centers.append((terrainX, terrainY))
+    else:
+        # For a wilderness map pixel, add a location at the center with a 1 in 32 chance
+        if should_generate_location(32):
+            centers.append((64, 64))
+    return centers
+
 def generate_csv_with_locations(road_data_filename, track_data_filename, dflocations_filename, output_csv_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
@@ -91,18 +110,28 @@ def generate_csv_with_locations(road_data_filename, track_data_filename, dflocat
         
         for y in range(height):
             for x in range(width):
-                # Skip the entire map pixel if it's a town or hamlet
                 if (x, y) in town_exclusions:
                     continue
+
                 combined_paths, has_any_path = check_coordinate(x, y, road_data, track_data, width)
-                # Skip the central cell if there's an exclusion
-                if (x, y) not in exclusions:
-                    centers = cell_center_from_direction(combined_paths, has_any_path)
-                else:
-                    centers = cell_center_from_direction(combined_paths, False)
+                
+                # Generate locations on road cells with a 1 in 6 chance
+                road_centers = cell_center_from_direction(combined_paths, False)
+                road_centers = [center for center in road_centers if should_generate_location(6)]
+                
+                # Handle wilderness cells within the map pixel
+                wilderness_centers = generate_wilderness_centers(has_any_path, exclusions, x, y)
+                
+                # Combine centers from roads and wilderness, but exclude the center if it's already marked by DFLocation.csv
+                centers = road_centers + wilderness_centers
+                if (x, y) in exclusions:
+                    centers = [center for center in centers if center != (64, 64)]
+                
+                # Write the locations to the CSV
                 for terrainX, terrainY in centers:
                     gisX, gisY = calculate_gis_coordinates(x, y, terrainX, terrainY)
                     writer.writerow(['', '', '', x, y, terrainX, terrainY, '', gisX, gisY])
 
 # Example usage
 generate_csv_with_locations('roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'locations.csv')
+
