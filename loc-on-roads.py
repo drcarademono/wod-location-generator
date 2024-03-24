@@ -168,9 +168,14 @@ def generate_csv_with_locations(road_data_filename, track_data_filename, dflocat
                     if is_center_water_pixel(cell_x, cell_y, water_map) or (x, y) in town_exclusions:
                         continue
 
-                    # Calculate GIS coordinates and write to CSV if the cell is not water
+                    # Calculate GIS coordinates
                     gisX, gisY = calculate_gis_coordinates(x, y, terrainX, terrainY)
-                    writer.writerow(['', '', '', x, y, terrainX, terrainY, '', gisX, gisY])
+
+                    # Generate locationID with leading zeros if necessary
+                    locationID = f"{x:02}{terrainX:02}{y:02}{terrainY:02}"
+
+                    # Write to CSV if the cell is not water
+                    writer.writerow(['', '', '', x, y, terrainX, terrainY, locationID, gisX, gisY])
 
     water_map.close()
 
