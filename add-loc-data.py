@@ -141,6 +141,20 @@ def add_region(csv_filename, gpkg_filename):
 
     return locations_df
 
+def determine_wilderness_level(row):
+    # Conditions for wilderness_level 0
+    if row['roads'] or row['df_locationtype'] in ['TownCity', 'TownHamlet', 'TownVillage']:
+        return 0
+    
+    # Conditions for wilderness_level 1
+    if not row['roads'] and row['roads_vector'] or \
+       row['tracks'] or \
+       row['df_locationtype'] in ['HomeFarms', 'Tavern', 'ReligionTemple', 'HomeWealthy']:
+        return 1
+    
+    # If none of the above conditions are met, assign wilderness_level 2
+    return 2
+
 # Main function that processes all the data and updates the CSV
 def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename, climate_image_filename, gpkg_filename):
     road_data = read_bytes_file(road_data_filename)
@@ -189,14 +203,14 @@ def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filena
     # Clean duplicates based on 'locationID' just before exporting
     locations_df = locations_df.drop_duplicates(subset='locationID', keep='first')
 
+    # Apply the determine_wilderness_level function to each row to calculate 'wilderness_level'
+    locations_df['wilderness_level'] = locations_df.apply(determine_wilderness_level, axis=1)
+    
     # Prepare the fieldnames list for the CSV output
     fieldnames = list(locations_df.columns)
-
-    # Convert DataFrame to list of dicts for writing to CSV
-    updated_locations = locations_df.to_dict('records')
-
+    
     # Write the final updated data to CSV
-    write_csv_file('updated_' + csv_filename, fieldnames, updated_locations)
+    write_csv_file('updated_' + csv_filename, fieldnames, locations_df.to_dict('records'))
 
 # Example usage:
 update_csv_with_all_data(
