@@ -1,5 +1,6 @@
 import csv
 import random
+from PIL import Image
 
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
@@ -58,6 +59,8 @@ def cell_center_from_direction(directions, has_any_path):
     for direction, has_path in directions.items():
         if has_path:
             centers.append(direction_to_center[direction])
+    # Filter out any coordinates that are not 32, 64, or 95
+    centers = [center for center in centers if center[0] in [32, 64, 95] and center[1] in [32, 64, 95]]
     return centers
 
 def calculate_gis_coordinates(worldX, worldY, terrainX, terrainY):
@@ -84,54 +87,94 @@ def should_generate_location(probability):
     """Return True with a likelihood of 1/probability."""
     return random.randint(1, probability) == 1
 
-def generate_wilderness_centers(has_road, exclusions, x, y):
+def generate_wilderness_centers(has_road, exclusions, x, y, map_pixel_has_df_location):
     centers = []
-    if has_road:
-        # In cells with roads, also check the empty cells for a 1 in 18 chance of location
-        for terrainX in range(0, 128, 64):
-            for terrainY in range(0, 128, 64):
+    valid_terrain_coords = [32, 64, 95]  # The valid terrain coordinates within a map pixel
+
+    if map_pixel_has_df_location:
+        # For cells in map pixels with locations recorded in DFLocations.csv
+        # Generate a location with a 1 in 6 chance, excluding the center cell
+        for terrainX in valid_terrain_coords:
+            for terrainY in valid_terrain_coords:
+                if (terrainX, terrainY) != (64, 64) and should_generate_location(6):
+                    centers.append((terrainX, terrainY))
+    elif has_road:
+        # In cells with roads, check the empty cells for a 1 in 18 chance of location
+        for terrainX in valid_terrain_coords:
+            for terrainY in valid_terrain_coords:
                 if (terrainX, terrainY) != (64, 64) and should_generate_location(18):
                     centers.append((terrainX, terrainY))
     else:
-        # For a wilderness map pixel, add a location at the center with a 1 in 32 chance
-        if should_generate_location(32):
-            centers.append((64, 64))
+        # For map pixels without any road, check each cell for a 1 in 64 chance of having a location
+        for terrainX in valid_terrain_coords:
+            for terrainY in valid_terrain_coords:
+                if should_generate_location(64):
+                    centers.append((terrainX, terrainY))
+                    
     return centers
 
-def generate_csv_with_locations(road_data_filename, track_data_filename, dflocations_filename, output_csv_filename):
+
+def is_center_water_pixel(cell_x, cell_y, water_map):
+    # The scaling factors are determined by the ratio of the water map size to the game map size (in cells)
+    scale_x = water_map.size[0] / 3000  # water map width / game map width in cells
+    scale_y = water_map.size[1] / 1500  # water map height / game map height in cells
+    
+    # Calculate the corresponding top-left pixel of the cell block on the water map
+    water_x = int(cell_x * scale_x)
+    water_y = int(cell_y * scale_y)
+    
+    # Determine the center of the cell block on the water map
+    center_x = water_x + int(scale_x / 2)
+    center_y = water_y + int(scale_y / 2)
+    
+    # Assuming the water is represented by black in RGBA
+    black_color = (0, 0, 0, 255)  
+    pixel_color = water_map.getpixel((center_x, center_y))
+    
+    return pixel_color == black_color
+
+def generate_csv_with_locations(road_data_filename, track_data_filename, dflocations_filename, water_map_filename, output_csv_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
     exclusions, town_exclusions = load_exclusions_from_dflocations(dflocations_filename)
-    width, height = 1000, 500
+    water_map = Image.open(water_map_filename)  # Open the detailed water map
+    width, height = 1000, 500  # Width and height for the game map
 
     with open(output_csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['name', 'type', 'prefab', 'worldX', 'worldY', 'terrainX', 'terrainY', 'locationID', 'gisX', 'gisY'])
-        
+
         for y in range(height):
             for x in range(width):
-                if (x, y) in town_exclusions:
-                    continue
-
                 combined_paths, has_any_path = check_coordinate(x, y, road_data, track_data, width)
+                map_pixel_has_df_location = (x, y) in exclusions
                 
-                # Generate locations on road cells with a 1 in 6 chance
-                road_centers = cell_center_from_direction(combined_paths, False)
-                road_centers = [center for center in road_centers if should_generate_location(6)]
-                
-                # Handle wilderness cells within the map pixel
-                wilderness_centers = generate_wilderness_centers(has_any_path, exclusions, x, y)
-                
-                # Combine centers from roads and wilderness, but exclude the center if it's already marked by DFLocation.csv
-                centers = road_centers + wilderness_centers
-                if (x, y) in exclusions:
-                    centers = [center for center in centers if center != (64, 64)]
-                
-                # Write the locations to the CSV
+                # If the map pixel is listed in DFLocations.csv, all cells have a 1 in 6 chance of getting a location,
+                # except for the center cell (64, 64), which is handled within the generate_wilderness_centers function.
+                if map_pixel_has_df_location:
+                    centers = generate_wilderness_centers(True, exclusions, x, y, True)
+                else:
+                    road_centers = cell_center_from_direction(combined_paths, has_any_path)
+                    road_centers = [center for center in road_centers if should_generate_location(6)]
+                    wilderness_centers = generate_wilderness_centers(has_any_path, exclusions, x, y, False)
+                    centers = road_centers + wilderness_centers
+
                 for terrainX, terrainY in centers:
+                    # Convert terrain coordinates (0-127) to cell coordinates (0-2) and adjust for water map checking
+                    cell_x = (x * 3) + (terrainX // (128 // 3))
+                    cell_y = (y * 3) + (terrainY // (128 // 3))
+
+                    # Skip if the center of the cell would be in water or if it's a town exclusion
+                    if is_center_water_pixel(cell_x, cell_y, water_map) or (x, y) in town_exclusions:
+                        continue
+
+                    # Calculate GIS coordinates and write to CSV if the cell is not water
                     gisX, gisY = calculate_gis_coordinates(x, y, terrainX, terrainY)
                     writer.writerow(['', '', '', x, y, terrainX, terrainY, '', gisX, gisY])
 
+    water_map.close()
+
+
 # Example usage
-generate_csv_with_locations('roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'locations.csv')
+generate_csv_with_locations('roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'DFWaterMap.png', 'locations.csv')
 
