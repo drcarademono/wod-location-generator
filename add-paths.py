@@ -1,5 +1,7 @@
 import csv
 from PIL import Image
+import pandas as pd
+import geopandas as gpd
 
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
@@ -67,9 +69,9 @@ def interpret_terrain(terrainX, terrainY, roads_vector):
     """
     # Lookup table for terrain values
     terrain_lookup = {
-        (32, 95): 'NW', (64, 95): 'N', (95, 95): 'NE',
-        (32, 64): 'W',  (95, 64): 'E',
-        (32, 32): 'SW', (64, 32): 'S', (95, 32): 'SE'
+        (32, 96): 'NW', (64, 96): 'N', (96, 96): 'NE',
+        (32, 64): 'W',  (96, 64): 'E',
+        (32, 32): 'SW', (64, 32): 'S', (96, 32): 'SE'
     }
     
     # Special case for (64, 64)
@@ -117,13 +119,36 @@ def get_climate_from_image(image, x, y):
     r, g, b = image.getpixel((x, y))[:3]  # Ignore the alpha channel
     return color_to_climate.get((r, g, b), 'unknown')  # Return 'unknown' if color does not match
 
-def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename, climate_image_filename):
+# Now let's define the function to add the region using geopandas
+def add_region(csv_filename, gpkg_filename):
+    # Read the geopackage file with regions
+    regions_gdf = gpd.read_file(gpkg_filename)
+
+    # Read the locations csv file into a pandas DataFrame
+    locations_df = pd.read_csv(csv_filename)
+    # Convert the DataFrame to a GeoDataFrame
+    locations_gdf = gpd.GeoDataFrame(locations_df, geometry=gpd.points_from_xy(locations_df.gisX, locations_df.gisY))
+    locations_gdf.crs = "EPSG:4326"  # Set CRS to WGS 84
+    
+    # Ensure both GeoDataFrames have the same CRS
+    locations_gdf = locations_gdf.to_crs(regions_gdf.crs)
+
+    # Spatial join to find which region each location belongs to
+    joined_gdf = gpd.sjoin(locations_gdf, regions_gdf, how="left", predicate='intersects')
+
+    # Add the region information to the original DataFrame
+    locations_df['region'] = joined_gdf['region']
+
+    return locations_df
+
+# Main function that processes all the data and updates the CSV
+def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename, climate_image_filename, gpkg_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
     df_location_map = read_df_location_csv(df_location_filename)
     locations = read_csv_file(csv_filename)
     width = 1000  # Width of the map, assuming it's the same for both roads and tracks
-    
+
     # Load the climate image
     with Image.open(climate_image_filename) as climate_img:
         for location in locations:
@@ -131,30 +156,54 @@ def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filena
             y = int(location['worldY'])
             terrainX = int(location['terrainX'])
             terrainY = int(location['terrainY'])
-            
+
             # Roads
-            roads_vector_str = check_road_coordinate(x, y, road_data, width)
-            location['roads_vector'] = roads_vector_str
-            location['roads'] = interpret_terrain(terrainX, terrainY, roads_vector_str)
+            location['roads_vector'] = check_road_coordinate(x, y, road_data, width)
+            location['roads'] = interpret_terrain(terrainX, terrainY, location['roads_vector'])
 
             # Tracks
-            tracks_vector_str = check_track_coordinate(x, y, track_data, width)
-            location['tracks_vector'] = tracks_vector_str
-            location['tracks'] = interpret_terrain(terrainX, terrainY, tracks_vector_str)
-            
+            location['tracks_vector'] = check_track_coordinate(x, y, track_data, width)
+            location['tracks'] = interpret_terrain(terrainX, terrainY, location['tracks_vector'])
+
             # DF Location Type
             location['df_locationtype'] = df_location_map.get((x, y), '')
-            
+
             # Climate
             location['climate'] = get_climate_from_image(climate_img, x, y)
 
-        # Update fieldnames to include the new fields
-        fieldnames = list(locations[0].keys())
-        for new_field in ['roads_vector', 'roads', 'tracks_vector', 'tracks', 'df_locationtype', 'climate']:
-            if new_field not in fieldnames:
-                fieldnames.append(new_field)
-        
-        write_csv_file('updated_' + csv_filename, fieldnames, locations)
+    # Convert updated location data to DataFrame for spatial join
+    locations_df = pd.DataFrame(locations)
+    
+    # Add region using the add_region function
+    locations_with_region_df = add_region(csv_filename, gpkg_filename)
+
+    # Ensure 'worldX' and 'worldY' are integers in both dataframes
+    locations_df['worldX'] = locations_df['worldX'].astype(int)
+    locations_df['worldY'] = locations_df['worldY'].astype(int)
+    locations_with_region_df['worldX'] = locations_with_region_df['worldX'].astype(int)
+    locations_with_region_df['worldY'] = locations_with_region_df['worldY'].astype(int)
+
+    # Merge the updated location data with region information
+    locations_df = locations_df.merge(locations_with_region_df[['worldX', 'worldY', 'region']], on=['worldX', 'worldY'], how='left')
+
+    # Clean duplicates based on 'locationID' just before exporting
+    locations_df = locations_df.drop_duplicates(subset='locationID', keep='first')
+
+    # Prepare the fieldnames list for the CSV output
+    fieldnames = list(locations_df.columns)
+
+    # Convert DataFrame to list of dicts for writing to CSV
+    updated_locations = locations_df.to_dict('records')
+
+    # Write the final updated data to CSV
+    write_csv_file('updated_' + csv_filename, fieldnames, updated_locations)
 
 # Example usage:
-update_csv_with_all_data('locations.csv', 'roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'DFClimateMap.png')
+update_csv_with_all_data(
+    'locations.csv',
+    'roadData.bytes',
+    'trackData.bytes',
+    'DFLocations.csv',
+    'DFClimateMap.png',
+    'Regions.gpkg'
+)
