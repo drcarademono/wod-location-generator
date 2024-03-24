@@ -1,4 +1,5 @@
 import csv
+from PIL import Image
 
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
@@ -96,42 +97,64 @@ def read_df_location_csv(filename):
             df_location_map[key] = row['locationtype']
     return df_location_map
 
-def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename):
+# Dictionary to map colors to climate types
+color_to_climate = {
+    (0, 32, 192): 'ocean',
+    (0, 190, 0): 'woodland',
+    (191, 143, 191): 'woodlandHills',
+    (190, 166, 143): 'hauntedWoodland',
+    (230, 196, 230): 'mountain',
+    (216, 154, 62): 'hammerfellMountain',
+    (0, 152, 25): 'rainforest',
+    (115, 153, 141): 'swamp',
+    (180, 180, 180): 'subtropical',
+    (217, 217, 217): 'desert',
+    (255, 255, 255): 'desert2'
+}
+
+def get_climate_from_image(image, x, y):
+    """Get the climate type based on the pixel color at (x, y) in the image."""
+    r, g, b = image.getpixel((x, y))[:3]  # Ignore the alpha channel
+    return color_to_climate.get((r, g, b), 'unknown')  # Return 'unknown' if color does not match
+
+def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename, climate_image_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
+    df_location_map = read_df_location_csv(df_location_filename)
     locations = read_csv_file(csv_filename)
     width = 1000  # Width of the map, assuming it's the same for both roads and tracks
     
-    # Create the (worldX, worldY) to locationtype mapping
-    df_location_map = read_df_location_csv(df_location_filename)
+    # Load the climate image
+    with Image.open(climate_image_filename) as climate_img:
+        for location in locations:
+            x = int(location['worldX'])
+            y = int(location['worldY'])
+            terrainX = int(location['terrainX'])
+            terrainY = int(location['terrainY'])
+            
+            # Roads
+            roads_vector_str = check_road_coordinate(x, y, road_data, width)
+            location['roads_vector'] = roads_vector_str
+            location['roads'] = interpret_terrain(terrainX, terrainY, roads_vector_str)
 
-    for location in locations:
-        x = int(location['worldX'])
-        y = int(location['worldY'])
-        terrainX = int(location['terrainX'])
-        terrainY = int(location['terrainY'])
+            # Tracks
+            tracks_vector_str = check_track_coordinate(x, y, track_data, width)
+            location['tracks_vector'] = tracks_vector_str
+            location['tracks'] = interpret_terrain(terrainX, terrainY, tracks_vector_str)
+            
+            # DF Location Type
+            location['df_locationtype'] = df_location_map.get((x, y), '')
+            
+            # Climate
+            location['climate'] = get_climate_from_image(climate_img, x, y)
+
+        # Update fieldnames to include the new fields
+        fieldnames = list(locations[0].keys())
+        for new_field in ['roads_vector', 'roads', 'tracks_vector', 'tracks', 'df_locationtype', 'climate']:
+            if new_field not in fieldnames:
+                fieldnames.append(new_field)
         
-        # Roads
-        roads_vector_str = check_road_coordinate(x, y, road_data, width)
-        location['roads_vector'] = roads_vector_str
-        location['roads'] = interpret_terrain(terrainX, terrainY, roads_vector_str)
+        write_csv_file('updated_' + csv_filename, fieldnames, locations)
 
-        # Tracks
-        tracks_vector_str = check_track_coordinate(x, y, track_data, width)
-        location['tracks_vector'] = tracks_vector_str
-        location['tracks'] = interpret_terrain(terrainX, terrainY, tracks_vector_str)
-        
-        # DF Location Type
-        key = (x, y)
-        location['df_locationtype'] = df_location_map.get(key, '')
-
-    # Update fieldnames to include the new field
-    fieldnames = list(locations[0].keys())
-    if 'df_locationtype' not in fieldnames:
-        fieldnames.append('df_locationtype')
-        
-    write_csv_file('updated_' + csv_filename, fieldnames, locations)
-
-# Run the updated function to process roads, tracks data, and add df_locationtype
-update_csv_with_all_data('locations.csv', 'roadData.bytes', 'trackData.bytes', 'DFLocations.csv')
-
+# Example usage:
+update_csv_with_all_data('locations.csv', 'roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'DFClimateMap.png')
