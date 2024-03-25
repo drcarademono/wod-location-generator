@@ -52,15 +52,15 @@ def cell_center_from_direction(directions, has_any_path):
 
     # Mapping additional directions to 3x3 cell centers within a 128x128 grid
     direction_to_center = {
-        'N': (64, 96), 'NE': (96, 96), 'E': (96, 64), 'SE': (96, 32),
-        'S': (64, 32), 'SW': (32, 32), 'W': (32, 64), 'NW': (32, 96)
+        'N': (64, 107), 'NE': (107, 107), 'E': (107, 64), 'SE': (107, 21),
+        'S': (64, 21), 'SW': (21, 21), 'W': (21, 64), 'NW': (21, 107)
     }
 
     for direction, has_path in directions.items():
         if has_path:
             centers.append(direction_to_center[direction])
-    # Filter out any coordinates that are not 32, 64, or 96
-    centers = [center for center in centers if center[0] in [32, 64, 96] and center[1] in [32, 64, 96]]
+    # Filter out any coordinates that are not 21, 64, or 107
+    centers = [center for center in centers if center[0] in [21, 64, 107] and center[1] in [21, 64, 107]]
     return centers
 
 def calculate_gis_coordinates(worldX, worldY, terrainX, terrainY):
@@ -89,7 +89,7 @@ def should_generate_location(probability):
 
 def generate_wilderness_centers(has_road, exclusions, x, y, map_pixel_has_df_location):
     centers = []
-    valid_terrain_coords = [32, 64, 96]  # The valid terrain coordinates within a map pixel
+    valid_terrain_coords = [21, 64, 107]  # The valid terrain coordinates within a map pixel
 
     if map_pixel_has_df_location:
         # For cells in map pixels with locations recorded in DFLocations.csv

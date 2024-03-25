@@ -69,9 +69,9 @@ def interpret_terrain(terrainX, terrainY, roads_vector):
     """
     # Lookup table for terrain values
     terrain_lookup = {
-        (32, 96): 'NW', (64, 96): 'N', (96, 96): 'NE',
-        (32, 64): 'W',  (96, 64): 'E',
-        (32, 32): 'SW', (64, 32): 'S', (96, 32): 'SE'
+        (21, 107): 'NW', (64, 107): 'N', (107, 107): 'NE',
+        (21, 64): 'W',  (107, 64): 'E',
+        (21, 21): 'SW', (64, 21): 'S', (107, 21): 'SE'
     }
     
     # Special case for (64, 64)
