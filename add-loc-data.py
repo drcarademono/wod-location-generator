@@ -88,16 +88,19 @@ def interpret_terrain(terrainX, terrainY, roads_vector):
 
 def read_df_location_csv(filename):
     """
-    Reads the DFLocations.csv and returns a dictionary with (worldX, worldY) as keys
-    and locationtype as values.
+    Reads the DFLocations.csv and returns two dictionaries:
+    one with (worldX, worldY) as keys and locationtype as values,
+    and another with (worldX, worldY) as keys and dungeontype as values.
     """
-    df_location_map = {}
+    df_locationtype_map = {}
+    df_dungeontype_map = {}
     with open(filename, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             key = (int(row['worldX']), int(row['worldY']))
-            df_location_map[key] = row['locationtype']
-    return df_location_map
+            df_locationtype_map[key] = row['locationtype']
+            df_dungeontype_map[key] = row['dungeontype']
+    return df_locationtype_map, df_dungeontype_map
 
 # Dictionary to map colors to climate types
 color_to_climate = {
@@ -159,34 +162,28 @@ def determine_wilderness_level(row):
 def update_csv_with_all_data(csv_filename, road_data_filename, track_data_filename, df_location_filename, climate_image_filename, gpkg_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
-    df_location_map = read_df_location_csv(df_location_filename)
+    df_locationtype_map, df_dungeontype_map = read_df_location_csv(df_location_filename)
     locations = read_csv_file(csv_filename)
     width = 1000  # Width of the map, assuming it's the same for both roads and tracks
 
-    # Load the climate image
+    # Load the climate image and process each location
     with Image.open(climate_image_filename) as climate_img:
         for location in locations:
             x = int(location['worldX'])
             y = int(location['worldY'])
-            terrainX = int(location['terrainX'])
-            terrainY = int(location['terrainY'])
 
-            # Roads
+            # Assigning roads, tracks, location type, and climate
             location['roads_vector'] = check_road_coordinate(x, y, road_data, width)
-            location['roads'] = interpret_terrain(terrainX, terrainY, location['roads_vector'])
-
-            # Tracks
+            location['roads'] = interpret_terrain(int(location['terrainX']), int(location['terrainY']), location['roads_vector'])
             location['tracks_vector'] = check_track_coordinate(x, y, track_data, width)
-            location['tracks'] = interpret_terrain(terrainX, terrainY, location['tracks_vector'])
-
-            # DF Location Type
-            location['df_locationtype'] = df_location_map.get((x, y), '')
-
-            # Climate
+            location['tracks'] = interpret_terrain(int(location['terrainX']), int(location['terrainY']), location['tracks_vector'])
+            location['df_locationtype'] = df_locationtype_map.get((x, y), '')
+            location['df_dungeontype'] = df_dungeontype_map.get((x, y), '')  # New field for dungeon type
             location['climate'] = get_climate_from_image(climate_img, x, y)
 
-    # Convert updated location data to DataFrame for spatial join
+    # Convert updated location data to DataFrame for further processing
     locations_df = pd.DataFrame(locations)
+
     
     # Add region using the add_region function
     locations_with_region_df = add_region(csv_filename, gpkg_filename)

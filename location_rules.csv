@@ -1,16 +1,17 @@
-prefab,name,type,wilderness_level,in_region,not_in_region,in_climate,not_in_climate,probability_scale
-WOD_Ruins_01,WOD_Ruins,0,0,,,,,0.5
-WOD_BanditCamp_01,WOD_BanditCamp,0,0,,,,,0.5
-WOD_BanditFort_01,WOD_BanditFort,0,0,,,,,0.5
-WOD_GuardTower_01,WOD_GuardTower,0,0,,,,,10
-WOD_GuardTower_01,WOD_GuardTower,0,1,,,,,0
-WOD_GuardTower_01,WOD_GuardTower,0,2,,,,,0
-WOD_GuardTower_01,WOD_GuardTower,0,,Orsinium Area,,,,0
-WOD_OrcCamp_Small_01,WOD_OrcCamp,0,,Orsinium Area|Totambu,,,,20
-WOD_OrcCamp_Small_01,WOD_OrcCamp,0,,,Orsinium Area|Totambu,,,0.05
-WOD_OrcCamp_Small_01,WOD_OrcCamp,0,0,,,,,0.05
-WOD_OrcCamp_Small_01,WOD_OrcCamp,0,,,,mountain|woodlandHills,,3
-WOD_TigerLair_Desert_01,WOD_TigerLair,0,,,,,desert|desert2|rainforest|subtropical,0
-WOD_Shrine_Dibella_01,WOD_Shrine,0,0,,,,,0.25
-WOD_Shrine_Dibella_01,WOD_Shrine,0,1,,,,,0.1
-WOD_Shrine_Dibella_01,WOD_Shrine,0,2,,,,,0
+name,type,wilderness_level,in_region,not_in_region,in_climate,not_in_climate,df_locationtype,probability_scale
+WOD_Ruins,0,0,,,,,,0.5
+WOD_BanditCamp,0,0,,,,,,0.5
+WOD_BanditFort,0,,,,,,,0.25
+WOD_BanditFort,0,0,,,,,,0.5
+WOD_GuardTower,0,0,,,,,,5
+WOD_GuardTower,0,1,,,,,,0
+WOD_GuardTower,0,2,,,,,,0
+WOD_GuardTower,0,,Orsinium Area,,,,,0
+WOD_OrcCamp,0,,Orsinium Area|Totambu,,,,,20
+WOD_OrcCamp,0,,,Orsinium Area|Totambu,,,,0.05
+WOD_OrcCamp,0,0,,,,,,0.05
+WOD_OrcCamp,0,2,,,mountain|woodlandHills,,,3
+WOD_TigerLair,0,,,,,desert|desert2|rainforest|subtropical,,0
+WOD_Shrine,0,0,,,,,,2
+WOD_Shrine,0,1,,,,,,1
+WOD_Shrine,0,2,,,,,,0
