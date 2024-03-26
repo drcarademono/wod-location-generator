@@ -7,6 +7,21 @@ wilderness_chance = 64
 track_chance = 18
 road_chance = 6
 
+# Define the baseline brightness of the color #848683 for comparison
+baseline_brightness = (132 + 134 + 131) / 3  # Brightness of the color #848683
+
+def calculate_brightness(rgb):
+    """Calculate the average brightness of an RGB color."""
+    return sum(rgb) / 3
+
+def get_scaling_factor(worldX, worldY, image):
+    """Calculate the scaling factor based on pixel brightness at (worldX, worldY) compared to the reference color."""
+    pixel_rgb = image.getpixel((worldX, worldY))
+    pixel_brightness = calculate_brightness(pixel_rgb)
+    reference_brightness = calculate_brightness(reference_color_rgb)
+    scaling_factor = pixel_brightness / reference_brightness
+    return scaling_factor
+
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
         return file.read()
@@ -88,38 +103,6 @@ def load_exclusions_from_dflocations(dflocations_filename):
                 town_exclusions.add((worldX, worldY))
     return exclusions, town_exclusions
 
-
-def should_generate_location(probability):
-    """Return True with a likelihood of 1/probability."""
-    return random.randint(1, probability) == 1
-
-def generate_wilderness_centers(has_road, exclusions, x, y, map_pixel_has_df_location):
-    centers = []
-    valid_terrain_coords = [21, 64, 107]  # The valid terrain coordinates within a map pixel
-
-    if map_pixel_has_df_location:
-        # For cells in map pixels with locations recorded in DFLocations.csv
-        # Generate a location with a 1 in 6 chance, excluding the center cell
-        for terrainX in valid_terrain_coords:
-            for terrainY in valid_terrain_coords:
-                if (terrainX, terrainY) != (64, 64) and should_generate_location(6):
-                    centers.append((terrainX, terrainY))
-    elif has_road:
-        # In cells with roads, check the empty cells for a 1 in 18 chance of location
-        for terrainX in valid_terrain_coords:
-            for terrainY in valid_terrain_coords:
-                if (terrainX, terrainY) != (64, 64) and should_generate_location(18):
-                    centers.append((terrainX, terrainY))
-    else:
-        # For map pixels without any road, check each cell for a 1 in 64 chance of having a location
-        for terrainX in valid_terrain_coords:
-            for terrainY in valid_terrain_coords:
-                if should_generate_location(64):
-                    centers.append((terrainX, terrainY))
-                    
-    return centers
-
-
 def is_center_water_pixel(cell_x, cell_y, water_map):
     # The scaling factors are determined by the ratio of the water map size to the game map size (in cells)
     scale_x = water_map.size[0] / 3000  # water map width / game map width in cells
@@ -139,11 +122,53 @@ def is_center_water_pixel(cell_x, cell_y, water_map):
     
     return pixel_color == black_color
 
-def generate_csv_with_locations(road_data_filename, track_data_filename, dflocations_filename, water_map_filename, output_csv_filename):
+def should_generate_location(chance, worldX, worldY, heatmap):
+    """Decides whether to generate a location based on modified chance influenced by heatmap brightness."""
+    baseline_brightness = (132 + 134 + 131) / 3  # Brightness of the color #848683
+    scaling_factor = calculate_scaling_factor(worldX, worldY, heatmap, baseline_brightness)
+    adjusted_chance = max(1, int(chance * scaling_factor))  # Ensure the chance is at least 1
+    return random.randint(1, adjusted_chance) == 1
+
+def calculate_scaling_factor(worldX, worldY, heatmap, baseline_brightness):
+    pixel = heatmap.getpixel((worldX, worldY))
+    pixel_brightness = sum(pixel[:3]) / 3  # Average of R, G, B values
+    
+    # Inverting the scaling effect with a simple approach and normalization
+    scaling_factor = baseline_brightness / max(pixel_brightness, 1)  # Avoid division by zero
+    
+    # Normalize or limit the scaling factor to prevent extreme values
+    scaling_factor = min(max(scaling_factor, 0.5), 2)  # Example bounds: 0.5 to 2
+
+    return scaling_factor
+
+def generate_wilderness_centers(has_road, exclusions, x, y, map_pixel_has_df_location, heatmap):
+    """Generates wilderness center locations based on road presence and DFLocation exclusions, adjusted by heatmap."""
+    centers = []
+    valid_terrain_coords = [21, 64, 107]  # The valid terrain coordinates within a map pixel
+    global wilderness_chance, track_chance, road_chance  # Ensure these are defined at the script's start
+
+    # Adjust chances based on heatmap
+    if map_pixel_has_df_location:
+        chance = road_chance  # Adjusted example; choose the appropriate chance based on your logic
+    elif has_road:
+        chance = track_chance
+    else:
+        chance = wilderness_chance
+
+    for terrainX in valid_terrain_coords:
+        for terrainY in valid_terrain_coords:
+            if (terrainX, terrainY) != (64, 64) and should_generate_location(chance, x, y, heatmap):
+                centers.append((terrainX, terrainY))
+                
+    return centers
+    return centers
+
+def generate_csv_with_locations(road_data_filename, track_data_filename, dflocations_filename, water_map_filename, output_csv_filename, heatmap_filename):
     road_data = read_bytes_file(road_data_filename)
     track_data = read_bytes_file(track_data_filename)
     exclusions, town_exclusions = load_exclusions_from_dflocations(dflocations_filename)
     water_map = Image.open(water_map_filename)  # Open the detailed water map
+    heatmap = Image.open(heatmap_filename)  # Open the heatmap for scaling factors based on brightness
     width, height = 1000, 500  # Width and height for the game map
 
     with open(output_csv_filename, mode='w', newline='') as file:
@@ -158,11 +183,11 @@ def generate_csv_with_locations(road_data_filename, track_data_filename, dflocat
                 # If the map pixel is listed in DFLocations.csv, all cells have a 1 in 6 chance of getting a location,
                 # except for the center cell (64, 64), which is handled within the generate_wilderness_centers function.
                 if map_pixel_has_df_location:
-                    centers = generate_wilderness_centers(True, exclusions, x, y, True)
+                    centers = generate_wilderness_centers(True, exclusions, x, y, True, heatmap)
                 else:
                     road_centers = cell_center_from_direction(combined_paths, has_any_path)
-                    road_centers = [center for center in road_centers if should_generate_location(6)]
-                    wilderness_centers = generate_wilderness_centers(has_any_path, exclusions, x, y, False)
+                    road_centers = [center for center in road_centers if should_generate_location(road_chance, x, y, heatmap)]
+                    wilderness_centers = generate_wilderness_centers(has_any_path, exclusions, x, y, False, heatmap)
                     centers = road_centers + wilderness_centers
 
                 for terrainX, terrainY in centers:
@@ -183,9 +208,7 @@ def generate_csv_with_locations(road_data_filename, track_data_filename, dflocat
                     # Write to CSV if the cell is not water
                     writer.writerow(['', '', '', x, y, terrainX, terrainY, locationID, gisX, gisY])
 
-    water_map.close()
-
-
 # Example usage
-generate_csv_with_locations('roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'DFWaterMap.png', 'locations.csv')
+generate_csv_with_locations('roadData.bytes', 'trackData.bytes', 'DFLocations.csv', 'DFWaterMap.png', 'locations.csv', 'DFPopHeatMap.png')
+
 
