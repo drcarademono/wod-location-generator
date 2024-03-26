@@ -6,16 +6,18 @@ def update_locations_with_lookup(populated_locations_path, location_names_path, 
     populated_locations = pd.read_csv(populated_locations_path)
     location_names = pd.read_csv(location_names_path)
     
-    # Create a mapping from name to prefab and type
-    name_to_prefabs = location_names.groupby('name')['prefab'].apply(list).to_dict()
-    name_to_types = location_names.drop_duplicates('name').set_index('name')['type'].to_dict()
+    # Prepare a dictionary that maps each name to its possible prefabs along with type, sizeX, and sizeY
+    name_to_details = location_names.groupby('name').apply(lambda df: df[['prefab', 'type', 'sizeX', 'sizeY']].to_dict('records')).to_dict()
     
-    # Update prefab and type fields in populated locations
+    # Update prefab, type, sizeX, and sizeY fields in populated locations
     for index, row in populated_locations.iterrows():
-        # Choose a prefab at random for the given name
-        if row['name'] in name_to_prefabs:
-            populated_locations.at[index, 'prefab'] = np.random.choice(name_to_prefabs[row['name']])
-            populated_locations.at[index, 'type'] = name_to_types[row['name']]
+        # Choose a prefab and its details at random for the given name
+        if row['name'] in name_to_details:
+            chosen_entry = np.random.choice(name_to_details[row['name']])
+            populated_locations.at[index, 'prefab'] = chosen_entry['prefab']
+            populated_locations.at[index, 'type'] = chosen_entry['type']
+            populated_locations.at[index, 'sizeX'] = chosen_entry['sizeX']
+            populated_locations.at[index, 'sizeY'] = chosen_entry['sizeY']
         else:
             print(f"No prefab found for name: {row['name']}")
     

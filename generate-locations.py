@@ -2,6 +2,11 @@ import csv
 import random
 from PIL import Image
 
+# Example probability values, adjust them as needed
+wilderness_chance = 64
+track_chance = 18
+road_chance = 6
+
 def read_bytes_file(filename):
     with open(filename, 'rb') as file:
         return file.read()
@@ -82,6 +87,7 @@ def load_exclusions_from_dflocations(dflocations_filename):
             if row['locationtype'] in ['TownCity', 'TownHamlet']:
                 town_exclusions.add((worldX, worldY))
     return exclusions, town_exclusions
+
 
 def should_generate_location(probability):
     """Return True with a likelihood of 1/probability."""
