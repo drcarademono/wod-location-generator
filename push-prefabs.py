@@ -12,40 +12,51 @@ direction_offsets = {
 
 def get_opposite_directions(directions):
     """
-    Modified to consider diagonal roads and exclude opposite cardinal directions.
-    For diagonal roads, the script will identify cardinal directions that could potentially
-    move the location off the road.
+    Modified to exclude directions that would move the location onto a road or track.
+    For diagonal roads, it excludes the direction of the road and its component cardinal directions.
     """
     opposite = {
-        'N': ['S'],
-        'S': ['N'],
-        'E': ['W'],
-        'W': ['E']
+        'N': ['N', 'S'],
+        'S': ['S', 'N'],
+        'E': ['E', 'W'],
+        'W': ['W', 'E']
     }
-    # Diagonal roads require special handling. If a diagonal road is present,
-    # exclude directions that wouldn't move the location off the road.
-    diagonal_handling = {
-        'NE': ['S', 'W'],
-        'NW': ['S', 'E'],
-        'SE': ['N', 'W'],
-        'SW': ['N', 'E']
+    # Diagonal roads will block their component cardinal directions
+    diagonal_blocking = {
+        'NE': ['N', 'E'],
+        'NW': ['N', 'W'],
+        'SE': ['S', 'E'],
+        'SW': ['S', 'W']
     }
+    
     available_directions = set(['N', 'S', 'E', 'W'])
+    
     for d in directions:
         if d in opposite:
             available_directions -= set(opposite[d])
-        elif d in diagonal_handling:
-            available_directions -= set(diagonal_handling[d])
+        if d in diagonal_blocking:
+            available_directions -= set(diagonal_blocking[d])
+    
     return list(available_directions)
 
-def calculate_displacement(dx, dy, sizeX, sizeY):
+def calculate_cardinal_displacement(sizeX, sizeY):
     """
-    Since we are moving in cardinal directions only, the diagonal adjustment is no longer needed.
-    The displacement calculation is simplified to account for this.
+    Calculate the displacement needed to move the location off the cardinal-direction road.
     """
-    displacementX = dx * ((sizeX + 2) / 2.0)  # +2 for extra buffer
-    displacementY = dy * ((sizeY + 2) / 2.0)  # +2 for extra buffer
+    # Displacement is half the size plus buffer in the given cardinal direction
+    displacementX = (sizeX + 2) / 2.0  # +2 for extra buffer
+    displacementY = (sizeY + 2) / 2.0  # +2 for extra buffer
     return displacementX, displacementY
+
+def calculate_diagonal_displacement(sizeX, sizeY):
+    """
+    Calculate the displacement needed to move the location off the diagonal road.
+    """
+    # Calculate the half-diagonal span of the location including buffer
+    diagonal_span = np.sqrt((sizeX / 2) ** 2 + (sizeY / 2) ** 2)
+    # Displacement for diagonal directions; we move perpendicularly to the diagonal road
+    displacement = diagonal_span + 1  # +1 for extra buffer
+    return displacement, displacement
 
 def is_affected_by_road_track(roads, tracks):
     # Check if either roads or tracks field contains non-empty, non-null data
@@ -132,10 +143,16 @@ def move_off_road_track_general(row):
     }
     dx, dy = direction_offsets[new_direction]
     
-    # Calculate displacement without needing diagonal adjustment
-    displacementX, displacementY = calculate_displacement(dx, dy, sizeX, sizeY)
-    
-    # Move the location considering the adjusted displacement
+    # Determine the type of road and calculate displacement accordingly
+    if any(d in directions for d in ['N', 'E', 'S', 'W']):  # Cardinal road present
+        displacementX, displacementY = calculate_cardinal_displacement(sizeX, sizeY)
+    elif any(d in directions for d in ['NE', 'NW', 'SE', 'SW']):  # Diagonal road present
+        displacementX, displacementY = calculate_diagonal_displacement(sizeX, sizeY)
+    else:
+        # If neither cardinal nor diagonal roads are affecting the location, default to no displacement
+        displacementX, displacementY = 0, 0
+
+    # Apply the displacement to the location's coordinates
     new_x = round(min(max(row['terrainX'] + displacementX, sizeX / 2.0), 128 - sizeX / 2.0))
     new_y = round(min(max(row['terrainY'] + displacementY, sizeY / 2.0), 128 - sizeY / 2.0))
     
