@@ -137,7 +137,7 @@ def calculate_scaling_factor(worldX, worldY, heatmap, baseline_brightness):
     scaling_factor = baseline_brightness / max(pixel_brightness, 1)  # Avoid division by zero
     
     # Normalize or limit the scaling factor to prevent extreme values
-    scaling_factor = min(max(scaling_factor, 0.5), 2)  # Example bounds: 0.5 to 2
+    scaling_factor = min(max(scaling_factor, 1.0), 4.0)  # Example bounds: 0.5 to 2
 
     return scaling_factor
 

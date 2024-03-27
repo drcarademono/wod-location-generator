@@ -6,7 +6,7 @@ WOD_BanditFort,0,0,,,,,,,0.5
 WOD_GuardTower,0,0,,,,,,,5
 WOD_GuardTower,0,1,,,,,,,0
 WOD_GuardTower,0,2,,,,,,,0
-WOD_GuardTower,0,,Orsinium Area,,,,,,0
+WOD_GuardTower,0,,Orsinium Area,,,desert|desert2,,,0
 WOD_OrcCamp,0,,Orsinium Area|Totambu,,,,,,20
 WOD_OrcCamp,0,,,Orsinium Area|Totambu,,,,,0.05
 WOD_OrcCamp,0,0,,,,,,,0.05

@@ -3,32 +3,48 @@ import pandas as pd
 import random
 import numpy as np
 
+direction_offsets = {
+    'N': (0, 1),
+    'E': (1, 0),
+    'S': (0, -1),
+    'W': (-1, 0)
+}
+
 def get_opposite_directions(directions):
-    """Given a list of directions, returns a list of directions excluding the opposites and the same directions."""
+    """
+    Modified to consider diagonal roads and exclude opposite cardinal directions.
+    For diagonal roads, the script will identify cardinal directions that could potentially
+    move the location off the road.
+    """
     opposite = {
-        'N': ['N', 'S', 'SE', 'SW'],
-        'S': ['S', 'N', 'NE', 'NW'],
-        'E': ['E', 'W', 'SW', 'NW'],
-        'W': ['W', 'E', 'SE', 'NE'],
-        'NE': ['NE', 'SW', 'S', 'W'],
-        'NW': ['NW', 'SE', 'S', 'E'],
-        'SE': ['SE', 'NW', 'N', 'W'],
-        'SW': ['SW', 'NE', 'N', 'E']
+        'N': ['S'],
+        'S': ['N'],
+        'E': ['W'],
+        'W': ['E']
     }
-    available_directions = set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'])
+    # Diagonal roads require special handling. If a diagonal road is present,
+    # exclude directions that wouldn't move the location off the road.
+    diagonal_handling = {
+        'NE': ['S', 'W'],
+        'NW': ['S', 'E'],
+        'SE': ['N', 'W'],
+        'SW': ['N', 'E']
+    }
+    available_directions = set(['N', 'S', 'E', 'W'])
     for d in directions:
         if d in opposite:
             available_directions -= set(opposite[d])
+        elif d in diagonal_handling:
+            available_directions -= set(diagonal_handling[d])
     return list(available_directions)
 
 def calculate_displacement(dx, dy, sizeX, sizeY):
-    # Check if movement is diagonal
-    is_diagonal = dx != 0 and dy != 0
-    # Apply a larger adjustment for diagonal movements to ensure clearing the road
-    diagonal_adjustment = np.sqrt(2) if is_diagonal else 1
-
-    displacementX = dx * ((sizeX + 2) / 2.0) * diagonal_adjustment  # +2 for extra buffer
-    displacementY = dy * ((sizeY + 2) / 2.0) * diagonal_adjustment  # +2 for extra buffer
+    """
+    Since we are moving in cardinal directions only, the diagonal adjustment is no longer needed.
+    The displacement calculation is simplified to account for this.
+    """
+    displacementX = dx * ((sizeX + 2) / 2.0)  # +2 for extra buffer
+    displacementY = dy * ((sizeY + 2) / 2.0)  # +2 for extra buffer
     return displacementX, displacementY
 
 def is_affected_by_road_track(roads, tracks):
@@ -36,60 +52,74 @@ def is_affected_by_road_track(roads, tracks):
     return (pd.notnull(roads) and roads.strip() != "") or (pd.notnull(tracks) and tracks.strip() != "")
 
 def move_off_road_track_center(roads_tracks, sizeX, sizeY):
-    # Add 2 to each dimension for extra buffer
-    sizeX += 2
-    sizeY += 2
+    sizeX += 2  # Adding buffer
+    sizeY += 2  # Adding buffer
 
-    directions = ['E', 'W', 'N', 'S', 'NE', 'NW', 'SE', 'SW']
-    occupied = set()
+    # Splitting roads_tracks to identify occupied directions
+    roads_tracks_split = roads_tracks.split('|')
+    all_cardinals = {'N', 'E', 'S', 'W'}
+    occupied_directions = set(roads_tracks_split)
 
-    if isinstance(roads_tracks, str):
-        for direction in roads_tracks.split('|'):
-            if direction in directions:
-                occupied.add(direction)
-
-    available_directions = list(set(directions) - occupied)
+    available_directions = all_cardinals - occupied_directions
 
     if not available_directions:
-        new_direction = 'E'
+        # All cardinal directions are occupied. 
+        # As a fallback, move two steps away in a direction diagonally.
+        # This is a workaround for a rare case and should be refined as per your project requirements.
+        available_diagonals = {'NE', 'SE', 'SW', 'NW'} - occupied_directions
+        if not available_diagonals:
+            raise ValueError("No available directions to move from the center, including diagonals.")
+        chosen_diagonal = random.choice(list(available_diagonals))
+        if chosen_diagonal in ['NE', 'SE']:
+            dx = 2  # Move East if NE or SE is available
+        else:
+            dx = -2  # Move West if SW or NW is available
+        if chosen_diagonal in ['NE', 'NW']:
+            dy = 2  # Move North if NE or NW is available
+        else:
+            dy = -2  # Move South if SE or SW is available
     else:
-        new_direction = random.choice(available_directions)
+        # Pick a random direction from the available ones
+        new_direction = random.choice(list(available_directions))
+        direction_offsets = {
+            'E': (1, 0),
+            'W': (-1, 0),
+            'N': (0, 1),
+            'S': (0, -1)
+        }
+        dx, dy = direction_offsets[new_direction]
+        # Move one step away in the chosen direction
+        dx *= 2
+        dy *= 2
 
-    direction_offsets = {
-        'E': (1, 0),
-        'W': (-1, 0),
-        'N': (0, 1),
-        'S': (0, -1),
-        'NE': (1, 1),
-        'NW': (-1, 1),
-        'SE': (1, -1),
-        'SW': (-1, -1)
-    }
-    dx, dy = direction_offsets[new_direction]
+    # Calculate displacement without needing diagonal adjustment
+    displacementX = dx * ((sizeX + 2) / 2.0)  # Apply the buffer for x direction
+    displacementY = dy * ((sizeY + 2) / 2.0)  # Apply the buffer for y direction
     
-    # Apply diagonal adjustment if necessary
-    displacementX, displacementY = calculate_displacement(dx, dy, sizeX, sizeY)
-    
-    # Calculate new position considering diagonal adjustment
-    # Assuming the original center position (64,64) needs adjustment for context-specific logic
+    # Calculate new position considering the displacement
     new_x = round(64 + displacementX)
     new_y = round(64 + displacementY)
+    
     return new_x, new_y
 
-def move_off_road_track_general(row):
-    # Adjust sizes for buffer
-    sizeX, sizeY = row['sizeX'] + 2, row['sizeY'] + 2
 
-    # Handle NaN values by converting them to empty strings before splitting
+def move_off_road_track_general(row):
+    """
+    Adjusts the location off roads or tracks using only cardinal directions. It takes into account
+    diagonal roads by ensuring movement is in a direction that clears the location from such roads.
+    """
+    sizeX, sizeY = row['sizeX'] + 2, row['sizeY'] + 2  # Adjust sizes for buffer
+
+    # Handle NaN values by converting them to empty strings
     roads = str(row['roads']) if pd.notnull(row['roads']) else ""
     tracks = str(row['tracks']) if pd.notnull(row['tracks']) else ""
     directions = roads.split('|') + tracks.split('|')
 
-    # Get available directions that are not opposite to the roads/tracks
+    # Get available cardinal directions excluding those blocked by roads/tracks
     available_directions = get_opposite_directions(directions)
     
     if not available_directions:
-        # Fallback in case no available directions are left, which should be rare
+        # Fallback to original position if no available directions are left, which should be rare
         return row['terrainX'], row['terrainY']
     
     # Pick a random direction from the available ones
@@ -98,20 +128,17 @@ def move_off_road_track_general(row):
         'E': (1, 0),
         'W': (-1, 0),
         'N': (0, 1),
-        'S': (0, -1),
-        'NE': (1, 1),
-        'NW': (-1, 1),
-        'SE': (1, -1),
-        'SW': (-1, -1)
+        'S': (0, -1)
     }
     dx, dy = direction_offsets[new_direction]
     
-    # Apply diagonal adjustment if necessary
+    # Calculate displacement without needing diagonal adjustment
     displacementX, displacementY = calculate_displacement(dx, dy, sizeX, sizeY)
     
-    # Move the location considering the diagonal adjustment
+    # Move the location considering the adjusted displacement
     new_x = round(min(max(row['terrainX'] + displacementX, sizeX / 2.0), 128 - sizeX / 2.0))
     new_y = round(min(max(row['terrainY'] + displacementY, sizeY / 2.0), 128 - sizeY / 2.0))
+    
     return new_x, new_y
 
 def move_off_road_track(row):
