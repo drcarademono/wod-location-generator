@@ -3,7 +3,7 @@ WOD_Ruins,0,0,,,,,,,0.5
 WOD_BanditCamp,0,0,,,,,,,0.5
 WOD_BanditFort,0,,,,,,,,0.25
 WOD_BanditFort,0,0,,,,,,,0.5
-WOD_GuardTower,0,0,,,,,,,5
+WOD_GuardTower,0,0,,,,,,,3
 WOD_GuardTower,0,1,,,,,,,0
 WOD_GuardTower,0,2,,,,,,,0
 WOD_GuardTower,0,,Orsinium Area,,,desert|desert2,,,0
@@ -15,3 +15,9 @@ WOD_OrcCamp,0,,,,mountain|woodlandHills,,,,3
 WOD_Shrine,0,0,,,,,,,2
 WOD_Shrine,0,1,,,,,,,1
 WOD_Shrine,0,2,,,,,,,0
+WOD_FarmA,0,0,,,,desert|desert2,,,5
+WOD_FarmA,0,1,,,,desert|desert2,,,2
+WOD_FarmA,0,2,,,,desert|desert2,,,1
+WOD_FarmB,0,0,,,desert|desert2,,,,5
+WOD_FarmB,0,1,,,desert|desert2,,,,2
+WOD_FarmB,0,2,,,desert|desert2,,,,1

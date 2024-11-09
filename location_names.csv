@@ -49,6 +49,9 @@ WOD_OrcCamp_Medium_01,WOD_OrcCamp,0,17,13
 WOD_OrcCamp_Medium_02,WOD_OrcCamp,0,9,8
 WOD_OrcCamp_Medium_03,WOD_OrcCamp,0,16,21
 WOD_OrcCamp_Large_01,WOD_OrcCamp,0,20,18
+WOD_Tiger_Lair_Desert_01,WOD_TigerLair,0,,
+WOD_Tiger_Lair_Desert_02,WOD_TigerLair,0,,
+WOD_Tiger_Lair_Desert_03,WOD_TigerLair,0,,
 WOD_Shrine_Dibella_01,WOD_Shrine,0,3,3
 WOD_Shrine_Stendarr_Major_01,WOD_Shrine,0,1,1
 WOD_Shrine_Stendarr_Major_02,WOD_Shrine,0,1,1
@@ -133,3 +136,13 @@ WOD_Shrine_Zenithar_Minor_04,WOD_Shrine,0,1,1
 WOD_Shrine_Zenithar_Minor_05,WOD_Shrine,0,1,1
 WOD_Shrine_Zenithar_Minor_06,WOD_Shrine,0,1,1
 WOD_Shrine_Zenithar_Minor_07,WOD_Shrine,0,1,1
+WOD_Farmaa00,WOD_FarmA,0,32,32
+WOD_Farmaa01,WOD_FarmA,0,32,32
+WOD_Farmaa02,WOD_FarmA,0,32,32
+WOD_Farmaa03,WOD_FarmA,0,32,32
+WOD_Farmaa04,WOD_FarmA,0,32,32
+WOD_Farmba00,WOD_FarmB,0,32,32
+WOD_Farmba01,WOD_FarmB,0,32,32
+WOD_Farmba02,WOD_FarmB,0,32,32
+WOD_Farmba03,WOD_FarmB,0,32,32
+WOD_Farmba04,WOD_FarmB,0,32,32
