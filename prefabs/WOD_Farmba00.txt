@@ -1,13 +1,13 @@
 <locationPrefab>
-	<height>32</height>
-	<width>32</width>
+	<height>17</height>
+	<width>17</width>
 	<object>
 		<type>5</type>
 		<objectID>0</objectID>
-		<name>WODFARMBA00.RMB</name>
-		<posX>0</posX>
+		<name>FARMAA05.RMB</name>
+		<posX>-51.2</posX>
 		<posY>0.1</posY>
-		<posZ>0</posZ>
+		<posZ>-51.2</posZ>
 		<scaleX>1</scaleX>
 		<scaleY>1</scaleY>
 		<scaleZ>1</scaleZ>
