@@ -84,7 +84,7 @@ def calculate_diagonal_displacement(sizeX, sizeY):
     # Calculate the half-diagonal span of the location including buffer
     diagonal_span = np.sqrt((sizeX / 2) ** 2 + (sizeY / 2) ** 2)
     # Displacement for diagonal directions; we move perpendicularly to the diagonal road
-    displacement = diagonal_span + 1  # +1 for extra buffer
+    displacement = diagonal_span + (diagonal_span / 2) + 1  # +1 for extra buffer
     return displacement, displacement
 
 def is_affected_by_road_track(roads, tracks):

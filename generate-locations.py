@@ -3,9 +3,9 @@ import random
 from PIL import Image
 
 # Example probability values, adjust them as needed
-wilderness_chance = 64
-track_chance = 18
-road_chance = 6
+wilderness_chance = 32
+track_chance = 9
+road_chance = 3
 
 # Define the baseline brightness of the color #848683 for comparison
 baseline_brightness = (132 + 134 + 131) / 3  # Brightness of the color #848683
